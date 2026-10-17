@@ -70,4 +70,4 @@
 - Как выделять участки, в которых пробелы и знаки препинания имеют специальное значение?
 - Нужны ли настройка правил, форматирование выделенного фрагмента и автоматический запуск при вводе?
 
-[Диаграмма последовательности](document_formatting_sequence.md) · [Описание операции formatDocument](format_document_operation.md).
+[Диаграмма последовательности](document_formatting_sequence.puml) · [Описание операции formatDocument](format_document_operation.md).

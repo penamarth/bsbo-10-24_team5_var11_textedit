@@ -1,8 +1,3 @@
-# Диаграмма последовательности «Автоформатирование документа»
-
-Основной успешный сценарий прецедента [«Автоформатирование документа»](document_fomratting.md).
-
-```plantuml
 @startuml
 actor Пользователь
 
@@ -20,4 +15,3 @@ deactivate Document
 Пользователь <-- AppContext : Отформатированный текст
 deactivate AppContext
 @enduml
-```
