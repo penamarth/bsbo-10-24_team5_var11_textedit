@@ -1,0 +1,23 @@
+# Диаграмма последовательности «Автоформатирование документа»
+
+Основной успешный сценарий прецедента [«Автоформатирование документа»](document_fomratting.md).
+
+```plantuml
+@startuml
+actor Пользователь
+
+Пользователь -> AppContext : formatDocument()
+activate AppContext
+AppContext -> Document : format()
+activate Document
+Document -> TextFormatter : format(text)
+activate TextFormatter
+Document <-- TextFormatter : formattedText
+deactivate TextFormatter
+Document -> Document : setText(formattedText)
+AppContext <-- Document : formattedText
+deactivate Document
+Пользователь <-- AppContext : Отформатированный текст
+deactivate AppContext
+@enduml
+```
