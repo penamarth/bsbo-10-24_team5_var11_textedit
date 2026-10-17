@@ -1,0 +1,70 @@
+@startuml
+title Автоформатирование документа
+hide footbox
+skinparam shadowing false
+skinparam defaultFontName SansSerif
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 240
+autonumber
+
+actor "Пользователь" as User
+control "app : AppContext" as App
+entity "document : Document" as Doc
+participant "formatter : TextFormatter" as Fmt
+boundary "renderer : Renderer" as View
+
+note over Doc, Fmt
+  TextFormatter реализует Formatter.
+  Команда выполняется последовательно.
+end note
+
+User -> App : formatActiveDocument()
+activate App
+App -> Doc : format()
+activate Doc
+Doc -> Fmt : format(text, format)
+activate Fmt
+Fmt --> Doc : новый текст или ошибка
+deactivate Fmt
+
+alt Ошибка или неподдерживаемый формат
+  note right of Doc : Текст и история отмены не меняются.
+  Doc --> App : error(reason)
+else Новый текст совпадает с исходным
+  note right of Doc : Текст, история и признак изменений прежние.
+  Doc --> App : unchanged
+else Текст изменился
+  Doc -> Doc : сохранить предыдущее состояние для отмены
+  Doc -> Doc : применить весь текст\nи обновить признак изменений
+  Doc --> App : changed
+end
+deactivate Doc
+App -> App : отразить результат команды в состоянии
+App --> User : команда завершена
+deactivate App
+
+View -> App : getState()
+App --> View : текст, признак изменений, результат
+View --> User : показать текст или сообщение
+
+opt Текст изменился, пользователь сразу выбирает «Отменить»
+  User -> App : undoActiveDocument()
+  activate App
+  App -> Doc : undo()
+  activate Doc
+  Doc -> Doc : восстановить предыдущее состояние
+  Doc --> App : restored
+  deactivate Doc
+  App -> App : обновить состояние редактора
+  App --> User : команда завершена
+  deactivate App
+  View -> App : getState()
+  App --> View : восстановленное состояние
+  View --> User : показать исходный текст
+end
+
+note over App, View
+  Запись на диск — отдельная команда
+  прецедента «Управление документами».
+end note
+@enduml
