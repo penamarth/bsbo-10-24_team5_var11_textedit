@@ -1,0 +1,50 @@
+@startuml
+actor Пользователь
+participant Renderer
+participant AppContext
+participant Document
+participant TypstCLI
+
+== Вариант А: Фоновое автообновление (Live Preview с Debounce) ==
+
+Пользователь -> Renderer : Ввод текста / Изменение исходного кода
+activate Renderer
+Renderer -> AppContext : Изменение текста документа
+activate AppContext
+AppContext -> Document : setText(newText)
+deactivate AppContext
+
+note over Renderer : Срабатывает таймер задержки\n(Debounce ~700 мс)
+
+Renderer -> Document : compileView()
+activate Document
+Document -> TypstCLI : compile(documentText, options)
+activate TypstCLI
+
+note over TypstCLI : Запуск внешнего процесса\n"typst compile" через stdin
+
+Document <-- TypstCLI : PreviewResult (pdfData, errors, success)
+deactivate TypstCLI
+
+Document -> Document : Сохранение PreviewResult в контексте
+Renderer <-- Document : PreviewResult
+deactivate Document
+
+alt success == true (Компиляция успешна)
+    Renderer -> Renderer : Отрендерить pdfData в окне превью
+else success == false (Обнаружены ошибки)
+    Renderer -> Renderer : Показать лог ошибок компиляции\nи подсветить строки кода
+end
+deactivate Renderer
+
+== Вариант Б: Закрытие панели предварительного просмотра ==
+
+Пользователь -> Renderer : Закрыть окно предварительного просмотра
+activate Renderer
+Renderer -> AppContext : togglePreview(false)
+activate AppContext
+note over AppContext, Document : Отключается фоновый вызов\ncompileView() для экономии CPU
+deactivate AppContext
+deactivate Renderer
+
+@enduml
