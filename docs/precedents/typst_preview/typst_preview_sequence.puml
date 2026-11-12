@@ -1,50 +1,62 @@
 @startuml
 actor Пользователь
-participant Renderer
 participant AppContext
 participant Document
+participant TypstCLIAdapter
 participant TypstCLI
+participant Renderer
 
-== Вариант А: Фоновое автообновление (Live Preview с Debounce) ==
+== Вариант А: Просмотр и обновление превью ==
 
-Пользователь -> Renderer : Ввод текста / Изменение исходного кода
-activate Renderer
-Renderer -> AppContext : Изменение текста документа
+Пользователь -> AppContext : Ввод текста / Запрос превью
 activate AppContext
+
 AppContext -> Document : setText(newText)
-deactivate AppContext
-
-note over Renderer : Срабатывает таймер задержки\n(Debounce ~700 мс)
-
-Renderer -> Document : compileView()
 activate Document
-Document -> TypstCLI : compile(documentText, options)
+note right of AppContext : При открытом превью\nсрабатывает Debounce (~700 мс)
+
+AppContext -> Document : compileView()
+Document -> TypstCLIAdapter : compile(documentText, options)
+activate TypstCLIAdapter
+
+TypstCLIAdapter -> TypstCLI : Запуск процесса "typst compile" (stdin)
 activate TypstCLI
-
-note over TypstCLI : Запуск внешнего процесса\n"typst compile" через stdin
-
-Document <-- TypstCLI : PreviewResult (pdfData, errors, success)
+TypstCLIAdapter <-- TypstCLI : Байты PDF или поток ошибок (stderr)
 deactivate TypstCLI
 
-Document -> Document : Сохранение PreviewResult в контексте
-Renderer <-- Document : PreviewResult
+Document <-- TypstCLIAdapter : PreviewResult (pdfData, errors, success)
+deactivate TypstCLIAdapter
+
+Document -> Document : Сохранить результат в контексте
+AppContext <-- Document : PreviewResult
 deactivate Document
 
-alt success == true (Компиляция успешна)
-    Renderer -> Renderer : Отрендерить pdfData в окне превью
-else success == false (Обнаружены ошибки)
-    Renderer -> Renderer : Показать лог ошибок компиляции\nи подсветить строки кода
-end
-deactivate Renderer
-
-== Вариант Б: Закрытие панели предварительного просмотра ==
-
-Пользователь -> Renderer : Закрыть окно предварительного просмотра
+AppContext -> Renderer : renderPreview(PreviewResult)
 activate Renderer
-Renderer -> AppContext : togglePreview(false)
-activate AppContext
-note over AppContext, Document : Отключается фоновый вызов\ncompileView() для экономии CPU
-deactivate AppContext
+
+alt success == true (Успешная компиляция)
+    Renderer -> Renderer : Отрисовать страницы PDF
+    AppContext <-- Renderer : Визуальное представление
+    Пользователь <-- AppContext : Отображение готового документа
+else success == false (Ошибка компиляции / CLI недоступен)
+    Renderer -> Renderer : Сформировать панель ошибок
+    AppContext <-- Renderer : Визуализация ошибок
+    Пользователь <-- AppContext : Уведомление об ошибках в коде
+end
+
 deactivate Renderer
+deactivate AppContext
+
+== Вариант Б: Закрытие панели превью ==
+
+Пользователь -> AppContext : Закрыть предварительный просмотр
+activate AppContext
+AppContext -> Renderer : closePreview()
+activate Renderer
+AppContext <-- Renderer : Панель закрыта
+deactivate Renderer
+note over AppContext, Document : Фоновая компиляция остановлена
+Пользователь <-- AppContext : Интерфейс без окна превью
+deactivate AppContext
 
 @enduml
