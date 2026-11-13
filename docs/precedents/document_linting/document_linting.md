@@ -76,4 +76,4 @@
 - Как отделять обычный текст от разметки и кода, не требующих проверки?
 - Проверять слова по отдельности или с учётом контекста предложения?
 
-[Диаграмма последовательности](../../sequence_diagrams/document_linting_sequence.puml) · [Описание системных операций](lint_document_operations.md) · [Технический разбор потока данных](../../../denis/document_linting.md)
+[Диаграмма последовательности](../../sequence_diagrams/document_linting_sequence.puml) · [Описание системных операций](lint_document_operations.md)
