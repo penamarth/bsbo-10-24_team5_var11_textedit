@@ -2,19 +2,19 @@
 
 ```plantuml
 @startuml
-AppContext <-- Renderer
+AppContext --> Renderer
 AppContext *-- Document
-
-Renderer --> TypstCLI
 
 Document --> FileSystemAPI
 Document --> Linter
 Document --> Formatter
 Document --> TypstLSP
+Document --> TypstCLIAdapter
+
 
 TextLinter ..|> Linter
 TextFormatter ..|> Formatter
-
-
 @enduml
 ```
+
+![Диаграмма классов](class_diagram.png)
