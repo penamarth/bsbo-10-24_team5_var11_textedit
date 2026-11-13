@@ -30,6 +30,7 @@ type Document struct {
 	linter                lint.Linter
 	lintOpts              lint.Options
 	diagnostics           []Diagnostic
+	suggCache             map[string][]string
 }
 
 func NewDocument(files *FileSystemAPI, linter lint.Linter) *Document {
@@ -45,6 +46,7 @@ func (d *Document) Modified() bool { return d.text != d.savedText }
 func (d *Document) SetText(text string) {
 	d.text = text
 	d.diagnostics = nil
+	d.suggCache = nil
 }
 
 // Open commits new state only when reading and validation both succeed.
@@ -119,6 +121,7 @@ func (d *Document) RunLint(opts lint.Options) lint.Result {
 		return res
 	}
 	d.lintOpts = opts
+	d.suggCache = make(map[string][]string)
 	d.diagnostics = make([]Diagnostic, len(res.Errors))
 	for i, e := range res.Errors {
 		e.Start, e.End = plain.mapRange(e.Start, e.End)
@@ -129,6 +132,33 @@ func (d *Document) RunLint(opts lint.Options) lint.Result {
 		res.Errors = append(res.Errors, diag.Error)
 	}
 	return res
+}
+
+// Suggestions returns corrections for diagnostic index, computing them
+// lazily on first request. Suggestion lookup is expensive on real
+// dictionaries, so it happens only when the user asks for a fix; results
+// are cached per word so a repeated misspelling costs one lookup.
+func (d *Document) Suggestions(index int) []string {
+	if index < 0 || index >= len(d.diagnostics) {
+		return nil
+	}
+	e := &d.diagnostics[index]
+	if e.Suggestions != nil {
+		return e.Suggestions
+	}
+	s, ok := d.linter.(lint.Suggester)
+	if !ok {
+		return nil
+	}
+	key := strings.ToLower(e.Word)
+	if sugg, ok := d.suggCache[key]; ok {
+		e.Suggestions = sugg
+		return sugg
+	}
+	sugg := s.Suggest(e.Word, d.lintOpts.MaxSuggestions)
+	d.suggCache[key] = sugg
+	e.Suggestions = sugg
+	return sugg
 }
 
 // mapRange converts half-open byte offsets in the plain text into half-open

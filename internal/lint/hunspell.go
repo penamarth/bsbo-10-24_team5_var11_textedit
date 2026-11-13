@@ -46,12 +46,9 @@ func NewHunspellLinter() (*HunspellLinter, error) {
 
 // Check tokenizes plainText and reports every Russian word the dictionary
 // does not know. Tokens without Cyrillic letters (Latin, digits) are skipped:
-// the bundle ships only a Russian dictionary.
+// the bundle ships only a Russian dictionary. Suggestions are left empty —
+// they are produced lazily through Suggest.
 func (l *HunspellLinter) Check(plainText string, opts Options) Result {
-	maxSugg := opts.MaxSuggestions
-	if maxSugg <= 0 {
-		maxSugg = defaultMaxSuggestions
-	}
 	var errs []Error
 	eachWord(plainText, func(start, end int) {
 		word := plainText[start:end]
@@ -59,19 +56,21 @@ func (l *HunspellLinter) Check(plainText string, opts Options) Result {
 			return
 		}
 		errs = append(errs, Error{
-			Start:       start,
-			End:         end,
-			Word:        word,
-			Message:     "Возможная опечатка",
-			Suggestions: l.suggest(word, maxSugg),
+			Start:   start,
+			End:     end,
+			Word:    word,
+			Message: "Возможная опечатка",
 		})
 	})
 	return Result{Errors: errs, Success: true}
 }
 
-// suggest asks Hunspell for corrections and normalizes their case to match
+// Suggest asks Hunspell for corrections and normalizes their case to match
 // the misspelled word (the engine returns base forms).
-func (l *HunspellLinter) suggest(word string, max int) []string {
+func (l *HunspellLinter) Suggest(word string, max int) []string {
+	if max <= 0 {
+		max = defaultMaxSuggestions
+	}
 	sugs, err := l.spell.Suggest(word, max)
 	if err != nil {
 		return nil

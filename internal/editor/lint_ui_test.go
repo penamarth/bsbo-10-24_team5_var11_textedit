@@ -93,7 +93,7 @@ func TestTerminalLintNoErrorsAndSkip(t *testing.T) {
 	}
 	key(tcell.KeyF9, 0)
 	// Move to "Пропустить": it is the button right after the last suggestion.
-	sugg := len(a.document.Diagnostics()[0].Suggestions)
+	sugg := len(a.document.Suggestions(0))
 	for i := 0; i < sugg; i++ {
 		key(tcell.KeyRight, 0)
 	}

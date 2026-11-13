@@ -211,11 +211,12 @@ func (a *AppContext) SelectError(index int) {
 		return
 	}
 	d := diagnostics[index]
-	a.renderer.ChooseFix(d.Word, d.Suggestions, func(choice int) {
+	suggestions := a.document.Suggestions(index)
+	a.renderer.ChooseFix(d.Word, suggestions, func(choice int) {
 		switch {
-		case choice >= 0 && choice < len(d.Suggestions):
-			a.applyFix(index, d.Suggestions[choice])
-		case choice == len(d.Suggestions):
+		case choice >= 0 && choice < len(suggestions):
+			a.applyFix(index, suggestions[choice])
+		case choice == len(suggestions):
 			a.skipError(index)
 		}
 	})

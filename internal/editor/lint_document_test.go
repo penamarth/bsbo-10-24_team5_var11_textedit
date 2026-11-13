@@ -116,6 +116,22 @@ func TestSkipErrorMarksSkipped(t *testing.T) {
 	}
 }
 
+func TestSuggestionsComputedLazily(t *testing.T) {
+	d := NewDocument(NewFileSystemAPI(), lint.NewTextLinter([]string{"программа"}))
+	d.SetText("програму")
+	d.RunLint(lint.Options{})
+	if d.Diagnostics()[0].Suggestions != nil {
+		t.Fatal("suggestions computed eagerly")
+	}
+	sugs := d.Suggestions(0)
+	if len(sugs) == 0 || sugs[0] != "программа" {
+		t.Fatalf("suggestions: %v", sugs)
+	}
+	if d.Suggestions(0) == nil {
+		t.Fatal("cached suggestions lost")
+	}
+}
+
 func TestSetTextClearsDiagnostics(t *testing.T) {
 	d := NewDocument(NewFileSystemAPI(), lint.NewTextLinter(nil))
 	d.SetText("програму")

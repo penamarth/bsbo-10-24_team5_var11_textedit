@@ -32,3 +32,12 @@ type Result struct {
 type Linter interface {
 	Check(plainText string, opts Options) Result
 }
+
+// Suggester is an optional capability of a Linter: computing corrections
+// for one misspelled word. Suggestions are expensive, so they are produced
+// lazily — only when the user asks for them — rather than during Check.
+type Suggester interface {
+	// Suggest returns up to max corrections for word. max <= 0 means
+	// the implementation's default.
+	Suggest(word string, max int) []string
+}

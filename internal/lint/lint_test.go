@@ -38,11 +38,7 @@ func TestCheckSkipsNonLetters(t *testing.T) {
 
 func TestSuggestionsRankedByDistance(t *testing.T) {
 	l := NewTextLinter([]string{"котлета", "кот", "колдун"})
-	res := l.Check("котт", Options{})
-	if len(res.Errors) != 1 {
-		t.Fatal(res)
-	}
-	sugg := res.Errors[0].Suggestions
+	sugg := l.Suggest("котт", 0)
 	if len(sugg) == 0 || sugg[0] != "кот" {
 		t.Fatalf("suggestions: %v", sugg)
 	}
@@ -50,8 +46,7 @@ func TestSuggestionsRankedByDistance(t *testing.T) {
 
 func TestSuggestionsLimitedByOptions(t *testing.T) {
 	l := NewTextLinter([]string{"кат", "кот", "кит", "котт", "кадр"})
-	res := l.Check("котр", Options{MaxSuggestions: 2})
-	if len(res.Errors) != 1 || len(res.Errors[0].Suggestions) > 2 {
-		t.Fatalf("limit ignored: %+v", res.Errors[0])
+	if len(l.Suggest("котр", 2)) > 2 {
+		t.Fatal("limit ignored")
 	}
 }

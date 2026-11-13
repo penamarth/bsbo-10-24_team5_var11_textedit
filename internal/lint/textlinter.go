@@ -48,12 +48,9 @@ func (l *TextLinter) add(word string) {
 }
 
 // Check tokenizes plainText into words and reports every word missing from
-// the dictionary. It never modifies the input.
+// the dictionary. It never modifies the input. Suggestions are left empty —
+// they are produced lazily through Suggest.
 func (l *TextLinter) Check(plainText string, opts Options) Result {
-	maxSugg := opts.MaxSuggestions
-	if maxSugg <= 0 {
-		maxSugg = defaultMaxSuggestions
-	}
 	var errs []Error
 	eachWord(plainText, func(start, end int) {
 		word := plainText[start:end]
@@ -61,11 +58,10 @@ func (l *TextLinter) Check(plainText string, opts Options) Result {
 			return
 		}
 		errs = append(errs, Error{
-			Start:       start,
-			End:         end,
-			Word:        word,
-			Message:     "Возможная опечатка",
-			Suggestions: l.suggest(word, maxSugg),
+			Start:   start,
+			End:     end,
+			Word:    word,
+			Message: "Возможная опечатка",
 		})
 	})
 	return Result{Errors: errs, Success: true}
@@ -77,9 +73,12 @@ func (l *TextLinter) known(word string) bool {
 	return ok
 }
 
-// suggest ranks dictionary words by edit distance to the misspelled word and
+// Suggest ranks dictionary words by edit distance to the misspelled word and
 // returns at most max corrections.
-func (l *TextLinter) suggest(word string, max int) []string {
+func (l *TextLinter) Suggest(word string, max int) []string {
+	if max <= 0 {
+		max = defaultMaxSuggestions
+	}
 	type cand struct {
 		w string
 		d int

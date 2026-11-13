@@ -45,17 +45,15 @@ func TestHunspellReportsMisspellingsWithOffsets(t *testing.T) {
 	if text[e.Start:e.End] != "програму" || e.Word != "програму" {
 		t.Fatalf("error: %+v", e)
 	}
-	if len(e.Suggestions) == 0 {
-		t.Fatal("no suggestions")
-	}
+	sugs := l.Suggest(e.Word, 0)
 	found := false
-	for _, s := range e.Suggestions {
+	for _, s := range sugs {
 		if s == "программу" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("suggestions: %v", e.Suggestions)
+		t.Fatalf("suggestions: %v", sugs)
 	}
 }
 
@@ -69,17 +67,17 @@ func TestHunspellSkipsNonCyrillic(t *testing.T) {
 
 func TestHunspellSuggestionsMatchCase(t *testing.T) {
 	l := testHunspell(t)
-	res := l.Check("Програму", Options{})
-	if len(res.Errors) != 1 || len(res.Errors[0].Suggestions) == 0 {
-		t.Fatalf("errors: %+v", res.Errors)
+	sugs := l.Suggest("Програму", 0)
+	if len(sugs) == 0 {
+		t.Fatal("no suggestions")
 	}
-	for _, s := range res.Errors[0].Suggestions {
+	for _, s := range sugs {
 		first, _ := utf8.DecodeRuneInString(s)
 		if !unicode.IsUpper(first) {
 			t.Fatalf("suggestion not capitalized: %q", s)
 		}
 	}
-	if !strings.HasPrefix(res.Errors[0].Suggestions[0], "П") {
-		t.Fatalf("suggestions: %v", res.Errors[0].Suggestions)
+	if !strings.HasPrefix(sugs[0], "П") {
+		t.Fatalf("suggestions: %v", sugs)
 	}
 }
