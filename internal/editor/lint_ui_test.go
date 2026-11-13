@@ -92,10 +92,10 @@ func TestTerminalLintNoErrorsAndSkip(t *testing.T) {
 		t.Fatalf("diagnostics not shown: %d", r.errCount)
 	}
 	key(tcell.KeyF9, 0)
-	// Move to "Пропустить": it is the item right after the last suggestion.
+	// Move to "Пропустить": it is the button right after the last suggestion.
 	sugg := len(a.document.Suggestions(0))
 	for i := 0; i < sugg; i++ {
-		key(tcell.KeyDown, 0)
+		key(tcell.KeyRight, 0)
 	}
 	key(tcell.KeyEnter, 0)
 	diags := a.document.Diagnostics()

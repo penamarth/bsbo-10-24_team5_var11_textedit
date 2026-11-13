@@ -186,11 +186,40 @@ func (r *Renderer) CursorPos() int {
 	return start
 }
 
-// ChooseFix shows the corrections as a dropdown list anchored under the
-// selected word, like the quick-fix menu in VS Code. Items are the suggested
+// fixMenuAnchored selects the fix-menu style: false shows a centered modal
+// (always fully visible), true shows the experimental anchored dropdown
+// (chooseFixAnchored — kept for a possible return, see its comment).
+const fixMenuAnchored = false
+
+// ChooseFix shows the corrections for one error. Items are the suggested
 // corrections followed by "Пропустить" and "Отмена"; done receives the item
-// index, Escape closes the dropdown without calling done.
+// index, Escape closes the menu without calling done.
 func (r *Renderer) ChooseFix(word string, suggestions []string, done func(int)) {
+	if fixMenuAnchored {
+		r.chooseFixAnchored(word, suggestions, done)
+		return
+	}
+	buttons := append(append([]string{}, suggestions...), "Пропустить", "Отмена")
+	modal := tview.NewModal().SetText(tview.Escape("Ошибка: " + word)).AddButtons(buttons)
+	modal.SetDoneFunc(func(index int, _ string) { r.dismiss(); done(index) })
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			r.dismiss()
+			return nil
+		}
+		return event
+	})
+	r.dialog = true
+	r.pages.AddPage("dialog", modal, true, true)
+	r.app.SetFocus(modal)
+}
+
+// chooseFixAnchored shows the corrections as a dropdown list anchored under
+// the selected word, like the quick-fix menu in VS Code. EXPERIMENTAL, kept
+// for a possible return: near the screen edges the anchored position still
+// has quirks (items can be clipped or hard to reach). Enable with
+// fixMenuAnchored.
+func (r *Renderer) chooseFixAnchored(word string, suggestions []string, done func(int)) {
 	list := tview.NewList()
 	items := append(append([]string{}, suggestions...), "Пропустить", "Отмена")
 	for i, item := range items {
