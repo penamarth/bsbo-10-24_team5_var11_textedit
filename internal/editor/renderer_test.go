@@ -19,8 +19,8 @@ func terminal(t *testing.T) (*AppContext, *Renderer, func(tcell.Key, rune)) {
 	r.app.SetScreen(screen)
 	screen.SetSize(100, 30)
 	t.Cleanup(screen.Fini)
-	a := NewAppContext(NewFileSystemAPI(), r)
-	r.Bind(a.SetText, a.New, a.Open, a.Save, a.SaveAs, a.Quit)
+	a := NewAppContext(NewFileSystemAPI(), r, nil)
+	r.Bind(Commands{Change: a.SetText, New: a.New, Open: a.Open, Save: a.Save, SaveAs: a.SaveAs, Quit: a.Quit})
 	r.app.SetFocus(r.area)
 	draw := func() { r.pages.SetRect(0, 0, 100, 30); r.pages.Draw(screen); screen.Show() }
 	draw()

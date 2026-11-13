@@ -3,18 +3,30 @@ package editor
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/lint"
 )
 
 // AppContext owns the document and coordinates commands. Its explicit dependency
 // on Renderer follows AppContext -> Renderer in the class diagram.
 type AppContext struct {
-	document *Document
-	renderer *Renderer
-	files    *FileSystemAPI
+	document     *Document
+	renderer     *Renderer
+	files        *FileSystemAPI
+	linter       lint.Linter
+	lintOpts     lint.Options
+	currentError int
 }
 
-func NewAppContext(files *FileSystemAPI, renderer *Renderer) *AppContext {
-	a := &AppContext{files: files, renderer: renderer, document: NewDocument(files)}
+func NewAppContext(files *FileSystemAPI, renderer *Renderer, linter lint.Linter) *AppContext {
+	a := &AppContext{
+		files:        files,
+		renderer:     renderer,
+		linter:       linter,
+		lintOpts:     lint.Options{Language: "ru"},
+		currentError: -1,
+	}
+	a.document = NewDocument(files, linter)
 	a.refresh(true)
 	return a
 }
@@ -23,26 +35,48 @@ func (a *AppContext) refresh(replace bool) {
 	a.renderer.Render(a.document.Text(), a.document.Path(), a.document.Modified(), replace)
 }
 
+// syncDiagnostics pushes the document's current diagnostics to the view.
+func (a *AppContext) syncDiagnostics() {
+	diagnostics := a.document.Diagnostics()
+	views := make([]ErrorView, len(diagnostics))
+	for i, d := range diagnostics {
+		views[i] = ErrorView{
+			Word:    d.Word,
+			Message: d.Message,
+			Start:   d.Start,
+			End:     d.End,
+			Skipped: d.Skipped,
+		}
+	}
+	a.renderer.ShowDiagnostics(views)
+}
+
 func (a *AppContext) SetText(text string) {
 	a.document.SetText(text)
+	a.currentError = -1
+	a.syncDiagnostics()
 	a.refresh(false)
 }
 
 func (a *AppContext) OpenInitial(path string) { a.open(path) }
 
 func (a *AppContext) open(path string) {
-	d := NewDocument(a.files)
+	d := NewDocument(a.files, a.linter)
 	if err := d.Open(path); err != nil {
 		a.renderer.Message(err.Error())
 		return
 	}
 	a.document = d
+	a.currentError = -1
+	a.syncDiagnostics()
 	a.refresh(true)
 }
 
 func (a *AppContext) New() {
 	a.guard(func() {
-		a.document = NewDocument(a.files)
+		a.document = NewDocument(a.files, a.linter)
+		a.currentError = -1
+		a.syncDiagnostics()
 		a.refresh(true)
 	})
 }
@@ -108,4 +142,106 @@ func (a *AppContext) save(as bool, continuation func()) {
 		}
 		write(abs)
 	})
+}
+
+// Lint runs the spelling check. Results are shown in the diagnostics panel;
+// a failed check only notifies the user and never blocks editing.
+func (a *AppContext) Lint() {
+	res := a.document.RunLint(a.lintOpts)
+	if !res.Success {
+		a.renderer.Message(res.ErrorMessage)
+		return
+	}
+	diagnostics := a.document.Diagnostics()
+	if len(diagnostics) == 0 {
+		a.currentError = -1
+		a.syncDiagnostics()
+		a.renderer.Message("Ошибок не найдено")
+		return
+	}
+	a.currentError = 0
+	a.syncDiagnostics()
+	a.focusError(0)
+}
+
+// NextError and PrevError cycle the highlight over unskipped diagnostics.
+func (a *AppContext) NextError() { a.moveError(1) }
+func (a *AppContext) PrevError() { a.moveError(-1) }
+
+func (a *AppContext) moveError(dir int) {
+	diagnostics := a.document.Diagnostics()
+	if len(diagnostics) == 0 {
+		return
+	}
+	i := a.currentError
+	if i < 0 {
+		i = 0
+	}
+	for range diagnostics {
+		i = (i + dir + len(diagnostics)) % len(diagnostics)
+		if !diagnostics[i].Skipped {
+			a.currentError = i
+			a.focusError(i)
+			return
+		}
+	}
+}
+
+func (a *AppContext) focusError(i int) {
+	diagnostics := a.document.Diagnostics()
+	if i < 0 || i >= len(diagnostics) {
+		return
+	}
+	a.renderer.HighlightError(i, diagnostics[i].Start, diagnostics[i].End)
+}
+
+// FixError opens the suggestion dialog for the currently highlighted error.
+func (a *AppContext) FixError() {
+	if a.currentError >= 0 {
+		a.SelectError(a.currentError)
+	}
+}
+
+// SelectError opens the suggestion dialog for diagnostic index.
+// Choice indexes: 0..len(suggestions)-1 apply that fix,
+// len(suggestions) skips the error, anything else cancels.
+func (a *AppContext) SelectError(index int) {
+	diagnostics := a.document.Diagnostics()
+	if index < 0 || index >= len(diagnostics) {
+		return
+	}
+	d := diagnostics[index]
+	a.renderer.ChooseFix(d.Word, d.Suggestions, func(choice int) {
+		switch {
+		case choice >= 0 && choice < len(d.Suggestions):
+			a.applyFix(index, d.Suggestions[choice])
+		case choice == len(d.Suggestions):
+			a.skipError(index)
+		}
+	})
+}
+
+func (a *AppContext) applyFix(index int, replacement string) {
+	res := a.document.ApplyFix(index, replacement)
+	a.refresh(true)
+	if !res.Success {
+		a.renderer.Message(res.ErrorMessage)
+		a.syncDiagnostics()
+		return
+	}
+	diagnostics := a.document.Diagnostics()
+	a.syncDiagnostics()
+	if len(diagnostics) == 0 {
+		a.currentError = -1
+		a.renderer.Message("Ошибок не найдено")
+		return
+	}
+	a.currentError = 0
+	a.focusError(0)
+}
+
+func (a *AppContext) skipError(index int) {
+	a.document.SkipError(index)
+	a.syncDiagnostics()
+	a.moveError(1)
 }

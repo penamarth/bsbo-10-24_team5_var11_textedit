@@ -14,7 +14,7 @@ func TestDocumentRoundTrip(t *testing.T) {
 			if err := os.WriteFile(path, []byte(original), 0640); err != nil {
 				t.Fatal(err)
 			}
-			d := NewDocument(NewFileSystemAPI())
+			d := NewDocument(NewFileSystemAPI(), nil)
 			if err := d.Open(path); err != nil {
 				t.Fatal(err)
 			}
@@ -54,7 +54,7 @@ func TestEditedEncodingAndSaveAs(t *testing.T) {
 	if err := os.WriteFile(path, []byte("\ufeffОдин\r\nДва"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	d := NewDocument(NewFileSystemAPI())
+	d := NewDocument(NewFileSystemAPI(), nil)
 	if err := d.Open(path); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestEditedEncodingAndSaveAs(t *testing.T) {
 }
 
 func TestFailuresPreserveDocument(t *testing.T) {
-	d := NewDocument(NewFileSystemAPI())
+	d := NewDocument(NewFileSystemAPI(), nil)
 	d.SetText("не терять")
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "invalid")
@@ -102,7 +102,7 @@ func TestFailuresPreserveDocument(t *testing.T) {
 }
 
 func TestNewDocumentAndSymlinkSave(t *testing.T) {
-	d := NewDocument(NewFileSystemAPI())
+	d := NewDocument(NewFileSystemAPI(), nil)
 	if d.Text() != "" || d.Path() != "" || d.Modified() {
 		t.Fatal("invalid new document")
 	}

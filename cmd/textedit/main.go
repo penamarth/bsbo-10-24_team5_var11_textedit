@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/editor"
+	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/lint"
 )
 
 func main() {
@@ -13,8 +14,21 @@ func main() {
 		os.Exit(2)
 	}
 	renderer := editor.NewRenderer()
-	app := editor.NewAppContext(editor.NewFileSystemAPI(), renderer)
-	renderer.Bind(app.SetText, app.New, app.Open, app.Save, app.SaveAs, app.Quit)
+	linter := lint.NewTextLinter(nil)
+	app := editor.NewAppContext(editor.NewFileSystemAPI(), renderer, linter)
+	renderer.Bind(editor.Commands{
+		Change:      app.SetText,
+		New:         app.New,
+		Open:        app.Open,
+		Save:        app.Save,
+		SaveAs:      app.SaveAs,
+		Lint:        app.Lint,
+		NextError:   app.NextError,
+		PrevError:   app.PrevError,
+		FixError:    app.FixError,
+		SelectError: app.SelectError,
+		Quit:        app.Quit,
+	})
 	if len(os.Args) == 2 {
 		app.OpenInitial(os.Args[1])
 	}
