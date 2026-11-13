@@ -3,7 +3,7 @@ actor Пользователь
 participant AppContext
 participant Document
 participant TypstCLIAdapter
-participant TypstCLI
+participant "TypstCLI\n<<external>>" as TypstCLI
 participant Renderer
 
 == Вариант А: Просмотр и обновление превью ==
@@ -11,37 +11,37 @@ participant Renderer
 Пользователь -> AppContext : Ввод текста / Запрос превью
 activate AppContext
 
-AppContext -> Document : setText(newText)
+AppContext -> Document : SetText(newText)
 activate Document
 note right of AppContext : При открытом превью\nсрабатывает Debounce (~700 мс)
 
-AppContext -> Document : compileView()
-Document -> TypstCLIAdapter : compile(documentText, options)
+AppContext -> Document : CompileView()
+Document -> TypstCLIAdapter : Compile(documentText, options)
 activate TypstCLIAdapter
 
-TypstCLIAdapter -> TypstCLI : Запуск процесса "typst compile" (stdin)
+TypstCLIAdapter -> TypstCLI : Запуск процесса "typst compile --format png" (stdin)
 activate TypstCLI
-TypstCLIAdapter <-- TypstCLI : Байты PDF или поток ошибок (stderr)
+TypstCLIAdapter <-- TypstCLI : Байты PNG или поток ошибок (stderr)
 deactivate TypstCLI
 
-Document <-- TypstCLIAdapter : PreviewResult (pdfData, errors, success)
+Document <-- TypstCLIAdapter : (PreviewResult, err)
 deactivate TypstCLIAdapter
 
 Document -> Document : Сохранить результат в контексте
-AppContext <-- Document : PreviewResult
+AppContext <-- Document : (PreviewResult, err)
 deactivate Document
 
-AppContext -> Renderer : renderPreview(PreviewResult)
+AppContext -> Renderer : RenderPreview(PreviewResult, err)
 activate Renderer
 
-alt success == true (Успешная компиляция)
-    Renderer -> Renderer : Отрисовать страницы PDF
+alt err == nil && Success == true (Успешная компиляция)
+    Renderer -> Renderer : Отрисовать PNG в TUI-панели
     AppContext <-- Renderer : Визуальное представление
-    Пользователь <-- AppContext : Отображение готового документа
-else success == false (Ошибка компиляции / CLI недоступен)
-    Renderer -> Renderer : Сформировать панель ошибок
+    Пользователь <-- AppContext : Отображение превью в терминале
+else Success == false || err != nil (Ошибка компиляции / CLI недоступен)
+    Renderer -> Renderer : Сформировать TUI-виджет ошибок
     AppContext <-- Renderer : Визуализация ошибок
-    Пользователь <-- AppContext : Уведомление об ошибках в коде
+    Пользователь <-- AppContext : Уведомление об ошибках в терминале
 end
 
 deactivate Renderer
@@ -51,12 +51,12 @@ deactivate AppContext
 
 Пользователь -> AppContext : Закрыть предварительный просмотр
 activate AppContext
-AppContext -> Renderer : closePreview()
+AppContext -> Renderer : ClosePreview()
 activate Renderer
-AppContext <-- Renderer : Панель закрыта
+AppContext <-- Renderer : Панель скрыта, место перераспределено
 deactivate Renderer
-note over AppContext, Document : Фоновая компиляция остановлена
-Пользователь <-- AppContext : Интерфейс без окна превью
+note over AppContext, Document : Фоновые горутины компиляции остановлены
+Пользователь <-- AppContext : TUI-интерфейс без панели превью
 deactivate AppContext
 
 @enduml
