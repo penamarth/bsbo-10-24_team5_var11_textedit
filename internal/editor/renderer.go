@@ -206,11 +206,11 @@ func (r *Renderer) ChooseFix(word string, suggestions []string, done func(int)) 
 		return event
 	})
 
-	// Anchor the dropdown below the cursor, clamped to the screen.
+	// Anchor the dropdown under the cursor inside the text area. When the
+	// line is too close to the bottom edge, the menu flips above the word.
 	_, _, toRow, toCol := r.area.GetCursor()
 	rowOff, colOff := r.area.GetOffset()
-	ax, ay, _, _ := r.area.GetInnerRect()
-	_, _, pw, ph := r.pages.GetRect()
+	ax, ay, aw, ah := r.area.GetInnerRect()
 	w := len([]rune(word)) + 8
 	for _, s := range items {
 		if n := len([]rune(s)) + 6; n > w {
@@ -225,18 +225,18 @@ func (r *Renderer) ChooseFix(word string, suggestions []string, done func(int)) 
 		h = 10
 	}
 	x := ax + toCol - colOff
+	if x+w > ax+aw {
+		x = ax + aw - w
+	}
+	if x < ax {
+		x = ax
+	}
 	y := ay + toRow - rowOff + 1
-	if x+w > pw {
-		x = pw - w
+	if y+h > ay+ah {
+		y = ay + toRow - rowOff - h // flip above the word
 	}
-	if x < 0 {
-		x = 0
-	}
-	if y+h > ph {
-		y = ay + toRow - rowOff - h // place above the line instead
-	}
-	if y < 0 {
-		y = 0
+	if y < ay {
+		y = ay
 	}
 	grid := tview.NewGrid().SetColumns(x, w, 0).SetRows(y, h, 0).
 		AddItem(list, 0, 1, 1, 1, 0, 0, true)

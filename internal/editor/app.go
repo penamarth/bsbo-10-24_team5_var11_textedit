@@ -237,6 +237,10 @@ func (a *AppContext) SelectError(index int) {
 }
 
 func (a *AppContext) applyFix(index int, replacement string) {
+	var fixPos int
+	if diagnostics := a.document.Diagnostics(); index >= 0 && index < len(diagnostics) {
+		fixPos = diagnostics[index].Start
+	}
 	res := a.document.ApplyFix(index, replacement)
 	a.refresh(true)
 	if !res.Success {
@@ -251,8 +255,20 @@ func (a *AppContext) applyFix(index int, replacement string) {
 		a.renderer.Message("Ошибок не найдено")
 		return
 	}
-	a.currentError = 0
-	a.focusError(0)
+	// Stay where the fix happened: highlight the error nearest to it
+	// instead of jumping back to the first one.
+	target, dist := -1, 0
+	for i, d := range diagnostics {
+		dd := d.Start - fixPos
+		if dd < 0 {
+			dd = -dd
+		}
+		if target < 0 || dd < dist {
+			target, dist = i, dd
+		}
+	}
+	a.currentError = target
+	a.focusError(target)
 }
 
 func (a *AppContext) skipError(index int) {
