@@ -1,0 +1,86 @@
+@startuml
+actor Пользователь
+participant AppContext
+participant Document
+participant TextLinter
+participant Renderer
+
+== Проверка документа ==
+
+Пользователь -> AppContext : lintDocument()
+activate AppContext
+
+AppContext -> Document : runLint()
+activate Document
+
+Document -> Document : extractPlainText()
+note right of Document : Текст без разметки Typst\n+ карта смещений в исходный документ
+
+Document -> TextLinter : check(plainText, options)
+activate TextLinter
+Document <-- TextLinter : LintResult(errors, success, errorMessage)
+deactivate TextLinter
+
+alt success == false (сбой линтера)
+    AppContext <-- Document : errorMessage
+    Пользователь <-- AppContext : Уведомление о недоступности\n(редактирование не блокируется)
+else success == true и errors пуст
+    Document -> Document : Очистить диагностику
+    AppContext <-- Document : LintResult
+    Пользователь <-- AppContext : «Ошибок не найдено»
+else success == true и ошибки найдены
+    Document -> Document : mapPositions()
+    note right of Document : Позиции ошибок переведены в\nкоординаты исходного документа,\nтекст не изменён
+    AppContext <-- Document : LintResult
+    AppContext -> Renderer : showDiagnostics(errors)
+    activate Renderer
+    Renderer -> Renderer : Подчеркнуть ошибки + панель списка
+    AppContext <-- Renderer : Отображение обновлено
+    deactivate Renderer
+    Пользователь <-- AppContext : Выделенные ошибки и их список
+end
+deactivate Document
+deactivate AppContext
+
+== Выбор и исправление ошибки ==
+
+Пользователь -> AppContext : selectError(position)
+activate AppContext
+AppContext -> Document : getErrorAt(position)
+activate Document
+AppContext <-- Document : LintError(message, suggestions)
+deactivate Document
+
+AppContext -> Renderer : showSuggestions(error)
+activate Renderer
+AppContext <-- Renderer : Отображение обновлено
+deactivate Renderer
+Пользователь <-- AppContext : Описание и варианты исправления
+
+alt Пользователь применяет исправление
+    Пользователь -> AppContext : applyFix(errorIndex, suggestion)
+    AppContext -> Document : applyFix(errorIndex, suggestion)
+    activate Document
+    Document -> Document : Заменить фрагмент (в памяти)\n+ обновить карту смещений
+    Document -> TextLinter : check(plainText, options)
+    activate TextLinter
+    Document <-- TextLinter : LintResult
+    deactivate TextLinter
+    AppContext <-- Document : LintResult
+    deactivate Document
+    AppContext -> Renderer : showDiagnostics(errors)
+    activate Renderer
+    AppContext <-- Renderer : Отображение обновлено
+    deactivate Renderer
+    Пользователь <-- AppContext : Актуальное состояние ошибок
+else Пользователь пропускает ошибку
+    Пользователь -> AppContext : skipError(errorIndex)
+    AppContext -> Document : skip(errorIndex)
+    activate Document
+    AppContext <-- Document : ok
+    deactivate Document
+    Пользователь <-- AppContext : Предложение скрыто, текст без изменений
+end
+deactivate AppContext
+
+@enduml
