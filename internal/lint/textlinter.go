@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -56,36 +55,19 @@ func (l *TextLinter) Check(plainText string, opts Options) Result {
 		maxSugg = defaultMaxSuggestions
 	}
 	var errs []Error
-	pos := 0
-	for pos < len(plainText) {
-		r, size := utf8.DecodeRuneInString(plainText[pos:])
-		if !unicode.IsLetter(r) {
-			pos += size
-			continue
-		}
-		start := pos
-		for pos < len(plainText) {
-			r, size = utf8.DecodeRuneInString(plainText[pos:])
-			if !unicode.IsLetter(r) {
-				break
-			}
-			pos += size
-		}
-		word := plainText[start:pos]
-		if !utf8.ValidString(word) {
-			continue
-		}
-		if l.known(word) {
-			continue
+	eachWord(plainText, func(start, end int) {
+		word := plainText[start:end]
+		if !utf8.ValidString(word) || l.known(word) {
+			return
 		}
 		errs = append(errs, Error{
 			Start:       start,
-			End:         pos,
+			End:         end,
 			Word:        word,
 			Message:     "Возможная опечатка",
 			Suggestions: l.suggest(word, maxSugg),
 		})
-	}
+	})
 	return Result{Errors: errs, Success: true}
 }
 

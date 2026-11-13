@@ -14,8 +14,14 @@ func main() {
 		os.Exit(2)
 	}
 	renderer := editor.NewRenderer()
-	linter := lint.NewTextLinter(nil)
-	app := editor.NewAppContext(editor.NewFileSystemAPI(), renderer, linter)
+	// The full Hunspell checker is the default; the lightweight dictionary
+	// linter stays as a fallback if the embedded dictionary fails to load.
+	linter, err := lint.NewHunspellLinter()
+	var l lint.Linter = lint.NewTextLinter(nil)
+	if err == nil {
+		l = linter
+	}
+	app := editor.NewAppContext(editor.NewFileSystemAPI(), renderer, l)
 	renderer.Bind(editor.Commands{
 		Change:      app.SetText,
 		New:         app.New,
