@@ -44,7 +44,6 @@ type Renderer struct {
 	status    *tview.TextView
 	editorCol *tview.Flex
 	root      *tview.Flex
-	errors    *tview.List
 	views     []ErrorView
 	errCount  int
 	state     string
@@ -52,6 +51,7 @@ type Renderer struct {
 	modified  bool
 	updating  bool
 	dialog    bool
+	commands  Commands
 }
 
 func NewRenderer() *Renderer {
@@ -60,49 +60,24 @@ func NewRenderer() *Renderer {
 		pages:  tview.NewPages(),
 		area:   tview.NewTextArea(),
 		status: tview.NewTextView(),
-		errors: tview.NewList(),
 	}
 	r.area.SetBorder(true)
 	r.area.SetPlaceholder("Введите текст…")
-	r.errors.SetBorder(true).SetTitle(" Ошибки ")
-	r.errors.ShowSecondaryText(false)
 	help := tview.NewTextView().SetText("F1 Справка · F2 Сохранить · F3 Открыть · F4 Новый · F5 Проверка · F6 Сохранить как · F7/F8 Ошибки · F9 Исправить · F10 Выход")
 	r.editorCol = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(r.area, 0, 1, true).AddItem(r.status, 1, 0, false).AddItem(help, 2, 0, false)
-	// The diagnostics panel stays in the layout permanently: adding or
-	// removing it would resize the text area, and tview resets the text
-	// selection whenever the width changes.
-	r.root = tview.NewFlex().AddItem(r.editorCol, 0, 1, true).AddItem(r.errors, 34, 0, false)
+	r.root = tview.NewFlex().AddItem(r.editorCol, 0, 1, true)
 	r.pages.AddPage("editor", r.root, true, true)
 	r.app.SetRoot(r.pages, true).EnablePaste(true)
 	return r
 }
 
 func (r *Renderer) Bind(c Commands) {
+	r.commands = c
 	r.area.SetChangedFunc(func() {
 		if !r.updating {
 			c.Change(r.area.GetText())
 		}
-	})
-	// Navigating the list moves the highlight in the text; Enter opens the
-	// suggestion dialog for the chosen error; Escape returns to the text.
-	r.errors.SetChangedFunc(func(index int, _ string, _ string, _ rune) {
-		if index >= 0 && index < len(r.views) {
-			v := r.views[index]
-			r.area.Select(v.Start, v.End)
-		}
-	})
-	r.errors.SetSelectedFunc(func(index int, _ string, _ string, _ rune) {
-		if c.SelectError != nil {
-			c.SelectError(index)
-		}
-	})
-	r.errors.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEscape {
-			r.app.SetFocus(r.area)
-			return nil
-		}
-		return event
 	})
 	r.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		// tview otherwise treats Ctrl-C as an unconditional application exit.
@@ -118,11 +93,7 @@ func (r *Renderer) Bind(c Commands) {
 			return event
 		}
 		if event.Key() == tcell.KeyTab && r.errCount > 0 {
-			if r.app.GetFocus() == r.area {
-				r.app.SetFocus(r.errors)
-			} else {
-				r.app.SetFocus(r.area)
-			}
+			r.showErrorList()
 			return nil
 		}
 		if event.Key() >= tcell.KeyF1 && event.Key() <= tcell.KeyF10 {
@@ -132,7 +103,7 @@ func (r *Renderer) Bind(c Commands) {
 		}
 		switch event.Key() {
 		case tcell.KeyF1:
-			r.Message("F2 — сохранить; F3 — открыть; F4 — новый\nF5 — проверить правописание; F7/F8 — ошибки; F9 — исправить\nF6 — сохранить как; F10 — выйти\nCtrl-Z — отменить; Ctrl-Y — повторить\nShift + стрелки — выделение\nCtrl-C / Ctrl-X / Ctrl-V — внутренний буфер\nTab — панель ошибок; Escape — отменить диалог")
+			r.Message("F2 — сохранить; F3 — открыть; F4 — новый\nF5 — проверить правописание; F7/F8 — ошибки; F9 — исправить\nF6 — сохранить как; F10 — выйти\nCtrl-Z — отменить; Ctrl-Y — повторить\nShift + стрелки — выделение\nCtrl-C / Ctrl-X / Ctrl-V — внутренний буфер\nTab — список ошибок; Escape — отменить диалог")
 		case tcell.KeyF2:
 			c.Save()
 		case tcell.KeyF3:
@@ -189,57 +160,127 @@ func (r *Renderer) Render(text, path string, modified, replace bool) {
 func (r *Renderer) refreshStatus() {
 	line := r.state + "  " + r.path
 	if r.errCount > 0 {
-		line += fmt.Sprintf("  ·  Ошибок: %d", r.errCount)
+		line += fmt.Sprintf("  ·  Ошибок: %d (Tab — список)", r.errCount)
 	}
 	r.status.SetText(line)
 }
 
-// ShowDiagnostics fills the diagnostics panel with the latest results.
-// Called after every check and after every text edit that invalidates
-// earlier results.
+// ShowDiagnostics stores the latest check results for the status line and the
+// on-demand error list. Called after every check and after every text edit
+// that invalidates earlier results.
 func (r *Renderer) ShowDiagnostics(views []ErrorView) {
 	r.views = views
-	r.errors.Clear()
-	for i, v := range views {
-		label := fmt.Sprintf("%d. %s — %s", i+1, v.Word, v.Message)
-		if v.Skipped {
-			label += " (пропущена)"
-		}
-		r.errors.AddItem(label, "", 0, nil)
-	}
 	r.errCount = len(views)
-	if r.errCount == 0 && r.app.GetFocus() == r.errors {
-		r.app.SetFocus(r.area)
-	}
 	r.refreshStatus()
 }
 
-// HighlightError selects the error's word in the text and marks the
-// corresponding entry in the diagnostics panel.
+// HighlightError selects the error's word in the text — the selection is the
+// visual indication of the current error (TextArea cannot style ranges).
 func (r *Renderer) HighlightError(index, start, end int) {
-	if index >= 0 && index < r.errors.GetItemCount() {
-		r.errors.SetCurrentItem(index)
-	}
 	r.area.Select(start, end)
 }
 
-// ChooseFix opens the suggestion dialog for one error. Buttons are the
-// suggested corrections followed by "Пропустить" and "Отмена". done receives
-// the button index; Escape closes the dialog without calling done.
+// CursorPos returns the byte offset of the cursor in the document text.
+func (r *Renderer) CursorPos() int {
+	_, start, _ := r.area.GetSelection()
+	return start
+}
+
+// ChooseFix shows the corrections as a dropdown list anchored under the
+// selected word, like the quick-fix menu in VS Code. Items are the suggested
+// corrections followed by "Пропустить" and "Отмена"; done receives the item
+// index, Escape closes the dropdown without calling done.
 func (r *Renderer) ChooseFix(word string, suggestions []string, done func(int)) {
-	buttons := append(append([]string{}, suggestions...), "Пропустить", "Отмена")
-	modal := tview.NewModal().SetText(tview.Escape("Ошибка: " + word)).AddButtons(buttons)
-	modal.SetDoneFunc(func(index int, _ string) { r.dismiss(); done(index) })
-	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	list := tview.NewList()
+	items := append(append([]string{}, suggestions...), "Пропустить", "Отмена")
+	for i, item := range items {
+		j := i
+		list.AddItem(item, "", 0, func() { r.dismiss(); done(j) })
+	}
+	list.SetBorder(true).SetTitle(" " + tview.Escape(word) + " ")
+	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEscape {
 			r.dismiss()
 			return nil
 		}
 		return event
 	})
+
+	// Anchor the dropdown below the cursor, clamped to the screen.
+	_, _, toRow, toCol := r.area.GetCursor()
+	rowOff, colOff := r.area.GetOffset()
+	ax, ay, _, _ := r.area.GetInnerRect()
+	_, _, pw, ph := r.pages.GetRect()
+	w := len([]rune(word)) + 8
+	for _, s := range items {
+		if n := len([]rune(s)) + 6; n > w {
+			w = n
+		}
+	}
+	if w > 40 {
+		w = 40
+	}
+	h := len(items) + 2
+	if h > 10 {
+		h = 10
+	}
+	x := ax + toCol - colOff
+	y := ay + toRow - rowOff + 1
+	if x+w > pw {
+		x = pw - w
+	}
+	if x < 0 {
+		x = 0
+	}
+	if y+h > ph {
+		y = ay + toRow - rowOff - h // place above the line instead
+	}
+	if y < 0 {
+		y = 0
+	}
+	grid := tview.NewGrid().SetColumns(x, w, 0).SetRows(y, h, 0).
+		AddItem(list, 0, 1, 1, 1, 0, 0, true)
 	r.dialog = true
-	r.pages.AddPage("dialog", modal, true, true)
-	r.app.SetFocus(modal)
+	r.pages.AddPage("dialog", grid, true, true)
+	r.app.SetFocus(list)
+}
+
+// showErrorList opens a centered modal listing every diagnostic. Enter jumps
+// to the chosen error and opens the fix dropdown; Escape closes the list.
+func (r *Renderer) showErrorList() {
+	list := tview.NewList()
+	for i, v := range r.views {
+		j, v := i, v
+		label := fmt.Sprintf("%d. %s — %s", i+1, v.Word, v.Message)
+		if v.Skipped {
+			label += " (пропущена)"
+		}
+		list.AddItem(label, "", 0, func() {
+			r.dismiss()
+			if r.commands.SelectError != nil {
+				r.commands.SelectError(j)
+			}
+		})
+	}
+	list.SetBorder(true).SetTitle(" Ошибки ")
+	list.SetChangedFunc(func(index int, _ string, _ string, _ rune) {
+		if index >= 0 && index < len(r.views) {
+			v := r.views[index]
+			r.area.Select(v.Start, v.End)
+		}
+	})
+	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			r.dismiss()
+			return nil
+		}
+		return event
+	})
+	h := len(r.views) + 2
+	if h > 15 {
+		h = 15
+	}
+	r.show(list, 50, h)
 }
 
 func (r *Renderer) show(primitive tview.Primitive, width, height int) {

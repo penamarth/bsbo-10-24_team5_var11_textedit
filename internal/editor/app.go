@@ -195,21 +195,35 @@ func (a *AppContext) focusError(i int) {
 	a.renderer.HighlightError(i, diagnostics[i].Start, diagnostics[i].End)
 }
 
-// FixError opens the suggestion dialog for the currently highlighted error.
+// FixError opens the suggestion dropdown for the error under the cursor,
+// falling back to the currently highlighted error.
 func (a *AppContext) FixError() {
-	if a.currentError >= 0 {
+	diagnostics := a.document.Diagnostics()
+	if len(diagnostics) == 0 {
+		return
+	}
+	pos := a.renderer.CursorPos()
+	for i, d := range diagnostics {
+		if pos >= d.Start && pos <= d.End {
+			a.SelectError(i)
+			return
+		}
+	}
+	if a.currentError >= 0 && a.currentError < len(diagnostics) {
 		a.SelectError(a.currentError)
 	}
 }
 
-// SelectError opens the suggestion dialog for diagnostic index.
-// Choice indexes: 0..len(suggestions)-1 apply that fix,
+// SelectError highlights diagnostic index and opens the suggestion dropdown
+// for it. Choice indexes: 0..len(suggestions)-1 apply that fix,
 // len(suggestions) skips the error, anything else cancels.
 func (a *AppContext) SelectError(index int) {
 	diagnostics := a.document.Diagnostics()
 	if index < 0 || index >= len(diagnostics) {
 		return
 	}
+	a.currentError = index
+	a.focusError(index)
 	d := diagnostics[index]
 	suggestions := a.document.Suggestions(index)
 	a.renderer.ChooseFix(d.Word, suggestions, func(choice int) {

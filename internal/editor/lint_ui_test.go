@@ -51,16 +51,16 @@ func TestTerminalLintHighlightsAndFixes(t *testing.T) {
 	a, r, key := terminalWithLinter(t, lint.NewTextLinter(nil))
 	typeText(key, "програму")
 	key(tcell.KeyF5, 0)
-	if r.errCount != 1 || r.errors.GetItemCount() != 1 {
+	if r.errCount != 1 || len(r.views) != 1 {
 		t.Fatalf("diagnostics not shown: %d", r.errCount)
 	}
 	if sel, _, _ := r.area.GetSelection(); sel != "програму" {
 		t.Fatalf("error not highlighted: %q", sel)
 	}
-	// Open the fix dialog and apply the first suggestion.
+	// Open the fix dropdown and apply the first suggestion.
 	key(tcell.KeyF9, 0)
 	if !r.dialog {
-		t.Fatal("fix dialog not opened")
+		t.Fatal("fix dropdown not opened")
 	}
 	key(tcell.KeyEnter, 0)
 	// Zero remaining errors show the «Ошибок не найдено» message.
@@ -92,10 +92,10 @@ func TestTerminalLintNoErrorsAndSkip(t *testing.T) {
 		t.Fatalf("diagnostics not shown: %d", r.errCount)
 	}
 	key(tcell.KeyF9, 0)
-	// Move to "Пропустить": it is the button right after the last suggestion.
+	// Move to "Пропустить": it is the item right after the last suggestion.
 	sugg := len(a.document.Suggestions(0))
 	for i := 0; i < sugg; i++ {
-		key(tcell.KeyRight, 0)
+		key(tcell.KeyDown, 0)
 	}
 	key(tcell.KeyEnter, 0)
 	diags := a.document.Diagnostics()
@@ -150,11 +150,16 @@ func TestTerminalLintListEnterOpensDialog(t *testing.T) {
 	typeText(key, "програму")
 	key(tcell.KeyF5, 0)
 	key(tcell.KeyTab, 0)
-	if r.app.GetFocus() != r.errors {
-		t.Fatal("tab did not focus error list")
+	if !r.dialog {
+		t.Fatal("tab did not open error list")
 	}
 	key(tcell.KeyEnter, 0)
+	// Enter on an error closes the list and opens the fix dropdown.
 	if !r.dialog {
-		t.Fatal("list enter did not open fix dialog")
+		t.Fatal("list enter did not open fix dropdown")
+	}
+	key(tcell.KeyEscape, 0)
+	if r.dialog {
+		t.Fatal("escape did not close dropdown")
 	}
 }
