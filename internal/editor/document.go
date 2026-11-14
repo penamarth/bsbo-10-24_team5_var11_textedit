@@ -10,17 +10,11 @@ import (
 	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/lint"
 )
 
-// Diagnostic is a lint error anchored to the document text. Start and End are
-// byte offsets into Document.Text(), half-open. Skipped marks errors the user
-// chose to ignore in this session.
 type Diagnostic struct {
 	lint.Error
 	Skipped bool
 }
 
-// Document owns the editable buffer, its last successfully saved state and
-// lint diagnostics. Neither the terminal nor AppContext may modify its fields
-// directly.
 type Document struct {
 	text, path, savedText string
 	original              []byte
@@ -41,15 +35,12 @@ func (d *Document) Text() string   { return d.text }
 func (d *Document) Path() string   { return d.path }
 func (d *Document) Modified() bool { return d.text != d.savedText }
 
-// SetText replaces the buffer. Diagnostics from an earlier check are stale
-// afterwards and therefore dropped; the user may re-run the check.
 func (d *Document) SetText(text string) {
 	d.text = text
 	d.diagnostics = nil
 	d.suggCache = nil
 }
 
-// Open commits new state only when reading and validation both succeed.
 func (d *Document) Open(path string) error {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -100,17 +91,12 @@ func (d *Document) Save(path string) error {
 	return nil
 }
 
-// Diagnostics returns a snapshot of the last check results.
 func (d *Document) Diagnostics() []Diagnostic {
 	out := make([]Diagnostic, len(d.diagnostics))
 	copy(out, d.diagnostics)
 	return out
 }
 
-// RunLint extracts plain text without Typst markup, asks the linter to check
-// it and maps reported positions back into document coordinates. The text
-// itself is never modified by checking. A failed check reports through
-// Result.Success and leaves existing diagnostics untouched.
 func (d *Document) RunLint(opts lint.Options) lint.Result {
 	if d.linter == nil {
 		return lint.Result{ErrorMessage: "средство проверки правописания недоступно"}
@@ -134,10 +120,6 @@ func (d *Document) RunLint(opts lint.Options) lint.Result {
 	return res
 }
 
-// Suggestions returns corrections for diagnostic index, computing them
-// lazily on first request. Suggestion lookup is expensive on real
-// dictionaries, so it happens only when the user asks for a fix; results
-// are cached per word so a repeated misspelling costs one lookup.
 func (d *Document) Suggestions(index int) []string {
 	if index < 0 || index >= len(d.diagnostics) {
 		return nil
@@ -161,8 +143,6 @@ func (d *Document) Suggestions(index int) []string {
 	return sugg
 }
 
-// mapRange converts half-open byte offsets in the plain text into half-open
-// byte offsets in the source document.
 func (p plainText) mapRange(start, end int) (int, int) {
 	if start < 0 {
 		start = 0
@@ -183,9 +163,6 @@ func (p plainText) mapRange(start, end int) (int, int) {
 	return p.offsets[start], p.offsets[end-1] + 1
 }
 
-// ApplyFix replaces the word of diagnostic index in the in-memory buffer and
-// re-runs the check so diagnostics reflect the new text. The file on disk is
-// not touched.
 func (d *Document) ApplyFix(index int, replacement string) lint.Result {
 	if index < 0 || index >= len(d.diagnostics) {
 		return lint.Result{ErrorMessage: "ошибка устарела, повторите проверку"}
@@ -195,8 +172,6 @@ func (d *Document) ApplyFix(index int, replacement string) lint.Result {
 	return d.RunLint(d.lintOpts)
 }
 
-// SkipError marks diagnostic index as ignored for this session.
-// The document text is not modified.
 func (d *Document) SkipError(index int) {
 	if index >= 0 && index < len(d.diagnostics) {
 		d.diagnostics[index].Skipped = true

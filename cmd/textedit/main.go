@@ -14,8 +14,7 @@ func main() {
 		os.Exit(2)
 	}
 	renderer := editor.NewRenderer()
-	// The full Hunspell checker is the default; the lightweight dictionary
-	// linter stays as a fallback if the embedded dictionary fails to load.
+
 	linter, err := lint.NewHunspellLinter()
 	var l lint.Linter = lint.NewTextLinter(nil)
 	if err == nil {

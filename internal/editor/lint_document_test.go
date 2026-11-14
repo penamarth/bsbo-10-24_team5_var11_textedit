@@ -6,8 +6,6 @@ import (
 	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/lint"
 )
 
-// fakeLinter is the legitimate use of the Linter interface: tests substitute
-// it for TextLinter without changing Document.
 type fakeLinter struct {
 	result lint.Result
 	seen   string

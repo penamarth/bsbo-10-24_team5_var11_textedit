@@ -60,7 +60,7 @@ func TestMapRangeTranslatesPositions(t *testing.T) {
 	if p.text != want {
 		t.Fatalf("plain text: %q != %q", p.text, want)
 	}
-	// «мир» sits at plain offsets 14..20 and at source offsets 18..24.
+
 	start, end := p.mapRange(len("Привет  "), len(p.text))
 	if src[start:end] != "мир" {
 		t.Fatalf("mapped range %d..%d = %q", start, end, src[start:end])

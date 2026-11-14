@@ -9,7 +9,6 @@ import (
 	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/lint"
 )
 
-// terminalWith mirrors terminal() but wires a real linter and lint commands.
 func terminalWithLinter(t *testing.T, linter lint.Linter) (*AppContext, *Renderer, func(tcell.Key, rune)) {
 	t.Helper()
 	r := NewRenderer()
@@ -57,13 +56,13 @@ func TestTerminalLintHighlightsAndFixes(t *testing.T) {
 	if sel, _, _ := r.area.GetSelection(); sel != "програму" {
 		t.Fatalf("error not highlighted: %q", sel)
 	}
-	// Open the fix dropdown and apply the first suggestion.
+
 	key(tcell.KeyF9, 0)
 	if !r.dialog {
 		t.Fatal("fix dropdown not opened")
 	}
 	key(tcell.KeyEnter, 0)
-	// Zero remaining errors show the «Ошибок не найдено» message.
+
 	if !r.dialog {
 		t.Fatal("missing 'no errors' message")
 	}
@@ -85,14 +84,13 @@ func TestTerminalLintNoErrorsAndSkip(t *testing.T) {
 	}
 	key(tcell.KeyEscape, 0)
 
-	// New text with an error: lint, then skip the error via the fix dialog.
 	typeText(key, " програму")
 	key(tcell.KeyF5, 0)
 	if r.errCount != 1 {
 		t.Fatalf("diagnostics not shown: %d", r.errCount)
 	}
 	key(tcell.KeyF9, 0)
-	// Move to "Пропустить": it is the button right after the last suggestion.
+
 	sugg := len(a.document.Suggestions(0))
 	for i := 0; i < sugg; i++ {
 		key(tcell.KeyRight, 0)
@@ -154,7 +152,7 @@ func TestTerminalLintListEnterOpensDialog(t *testing.T) {
 		t.Fatal("tab did not open error list")
 	}
 	key(tcell.KeyEnter, 0)
-	// Enter on an error closes the list and opens the fix dropdown.
+
 	if !r.dialog {
 		t.Fatal("list enter did not open fix dropdown")
 	}

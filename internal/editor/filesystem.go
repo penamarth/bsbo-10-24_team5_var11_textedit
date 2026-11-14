@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 )
 
-// FileSystemAPI adapts operating-system file operations to the document's needs.
-// It is concrete: the application does not need interchangeable implementations.
 type FileSystemAPI struct{}
 
 func NewFileSystemAPI() *FileSystemAPI { return &FileSystemAPI{} }
@@ -20,8 +18,6 @@ func (f *FileSystemAPI) Read(path string) ([]byte, error) {
 	return data, nil
 }
 
-// Write replaces a file only after its complete contents have been written.
-// Existing symbolic links retain their identity; their target is replaced.
 func (f *FileSystemAPI) Write(path string, data []byte) error {
 	target := path
 	mode := os.FileMode(0600)

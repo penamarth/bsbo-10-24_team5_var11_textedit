@@ -15,16 +15,11 @@ const (
 	maxEditDistance       = 2
 )
 
-// TextLinter is the concrete spelling checker: an embedded dictionary plus
-// edit-distance suggestions. It has no external dependencies.
 type TextLinter struct {
 	words map[string]struct{}
 	list  []string
 }
 
-// NewTextLinter builds a checker over the built-in Russian dictionary.
-// extra words are added to the dictionary (project-specific vocabulary,
-// tests, user additions).
 func NewTextLinter(extra []string) *TextLinter {
 	l := &TextLinter{words: make(map[string]struct{})}
 	for _, line := range strings.Split(dictRU, "\n") {
@@ -47,9 +42,6 @@ func (l *TextLinter) add(word string) {
 	}
 }
 
-// Check tokenizes plainText into words and reports every word missing from
-// the dictionary. It never modifies the input. Suggestions are left empty —
-// they are produced lazily through Suggest.
 func (l *TextLinter) Check(plainText string, opts Options) Result {
 	var errs []Error
 	eachWord(plainText, func(start, end int) {
@@ -67,14 +59,11 @@ func (l *TextLinter) Check(plainText string, opts Options) Result {
 	return Result{Errors: errs, Success: true}
 }
 
-// known reports whether the word occurs in the dictionary, case-insensitively.
 func (l *TextLinter) known(word string) bool {
 	_, ok := l.words[strings.ToLower(word)]
 	return ok
 }
 
-// Suggest ranks dictionary words by edit distance to the misspelled word and
-// returns at most max corrections.
 func (l *TextLinter) Suggest(word string, max int) []string {
 	if max <= 0 {
 		max = defaultMaxSuggestions

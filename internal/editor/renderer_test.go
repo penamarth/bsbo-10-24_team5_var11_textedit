@@ -10,8 +10,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-// Exercise actual widget input handlers and drawing on a terminal simulation.
-// All callbacks run synchronously on the same thread, just as in tview's loop.
 func terminal(t *testing.T) (*AppContext, *Renderer, func(tcell.Key, rune)) {
 	t.Helper()
 	r := NewRenderer()
@@ -94,8 +92,8 @@ func TestTerminalGuardsAndFailedSave(t *testing.T) {
 		t.Fatal("cancel lost text")
 	}
 	key(tcell.KeyF4, 0)
-	key(tcell.KeyEnter, 0)  // Save before New.
-	key(tcell.KeyEscape, 0) // Cancel path entry.
+	key(tcell.KeyEnter, 0)
+	key(tcell.KeyEscape, 0)
 	if a.document.Text() != "важно" {
 		t.Fatal("cancelled save continued New")
 	}
@@ -108,7 +106,7 @@ func TestTerminalGuardsAndFailedSave(t *testing.T) {
 	}
 	key(tcell.KeyEscape, 0)
 	key(tcell.KeyF4, 0)
-	key(tcell.KeyRight, 0) // Do not save.
+	key(tcell.KeyRight, 0)
 	key(tcell.KeyEnter, 0)
 	if a.document.Text() != "" || r.dialog {
 		t.Fatal("discard did not create new buffer")

@@ -1,8 +1,5 @@
 package lint
 
-// distance returns the Levenshtein edit distance between a and b computed on
-// runes. If the distance exceeds max, the result may be truncated early and
-// any value greater than max is returned.
 func distance(a, b string, max int) int {
 	ar, br := []rune(a), []rune(b)
 	if abs(len(ar)-len(br)) > max {

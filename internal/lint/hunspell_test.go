@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-// shared instance: loading the embedded dictionary takes ~400ms.
 var sharedHunspell *HunspellLinter
 
 func testHunspell(t *testing.T) *HunspellLinter {
@@ -24,8 +23,7 @@ func testHunspell(t *testing.T) *HunspellLinter {
 
 func TestHunspellRecognizesInflectedForms(t *testing.T) {
 	l := testHunspell(t)
-	// Inflected forms are the whole point of the morphology dictionary:
-	// TextLinter's word list would flag every one of these.
+
 	res := l.Check("Документа работает текста проверяет", Options{})
 	for _, e := range res.Errors {
 		if e.Word == "работает" || e.Word == "текста" || e.Word == "проверяет" || e.Word == "Документа" {

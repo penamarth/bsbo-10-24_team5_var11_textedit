@@ -7,8 +7,6 @@ import (
 	"github.com/penamarth/bsbo-10-24_team5_var11_textedit/internal/lint"
 )
 
-// AppContext owns the document and coordinates commands. Its explicit dependency
-// on Renderer follows AppContext -> Renderer in the class diagram.
 type AppContext struct {
 	document     *Document
 	renderer     *Renderer
@@ -35,7 +33,6 @@ func (a *AppContext) refresh(replace bool) {
 	a.renderer.Render(a.document.Text(), a.document.Path(), a.document.Modified(), replace)
 }
 
-// syncDiagnostics pushes the document's current diagnostics to the view.
 func (a *AppContext) syncDiagnostics() {
 	diagnostics := a.document.Diagnostics()
 	views := make([]ErrorView, len(diagnostics))
@@ -91,8 +88,6 @@ func (a *AppContext) Save()   { a.save(false, func() {}) }
 func (a *AppContext) SaveAs() { a.save(true, func() {}) }
 func (a *AppContext) Quit()   { a.guard(a.renderer.Stop) }
 
-// guard continues a destructive command only after an explicit decision and,
-// when requested, a successful save. Cancelled dialogs never call continuation.
 func (a *AppContext) guard(continuation func()) {
 	if !a.document.Modified() {
 		continuation()
@@ -144,8 +139,6 @@ func (a *AppContext) save(as bool, continuation func()) {
 	})
 }
 
-// Lint runs the spelling check. Results are shown in the diagnostics panel;
-// a failed check only notifies the user and never blocks editing.
 func (a *AppContext) Lint() {
 	res := a.document.RunLint(a.lintOpts)
 	if !res.Success {
@@ -164,7 +157,6 @@ func (a *AppContext) Lint() {
 	a.focusError(0)
 }
 
-// NextError and PrevError cycle the highlight over unskipped diagnostics.
 func (a *AppContext) NextError() { a.moveError(1) }
 func (a *AppContext) PrevError() { a.moveError(-1) }
 
@@ -195,8 +187,6 @@ func (a *AppContext) focusError(i int) {
 	a.renderer.HighlightError(i, diagnostics[i].Start, diagnostics[i].End)
 }
 
-// FixError opens the suggestion dropdown for the error under the cursor,
-// falling back to the currently highlighted error.
 func (a *AppContext) FixError() {
 	diagnostics := a.document.Diagnostics()
 	if len(diagnostics) == 0 {
@@ -214,9 +204,6 @@ func (a *AppContext) FixError() {
 	}
 }
 
-// SelectError highlights diagnostic index and opens the suggestion dropdown
-// for it. Choice indexes: 0..len(suggestions)-1 apply that fix,
-// len(suggestions) skips the error, anything else cancels.
 func (a *AppContext) SelectError(index int) {
 	diagnostics := a.document.Diagnostics()
 	if index < 0 || index >= len(diagnostics) {
@@ -255,8 +242,7 @@ func (a *AppContext) applyFix(index int, replacement string) {
 		a.renderer.Message("Ошибок не найдено")
 		return
 	}
-	// Stay where the fix happened: highlight the error nearest to it
-	// instead of jumping back to the first one.
+
 	target, dist := -1, 0
 	for i, d := range diagnostics {
 		dd := d.Start - fixPos
